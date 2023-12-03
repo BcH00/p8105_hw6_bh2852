@@ -9,8 +9,7 @@ output: github_document
 library(tidyverse)
 library(dplyr)
 library(modelr)
-library(knitr)
-library(purrr)
+library(viridis)
 library(mgcv)
 
 knitr::opts_chunk$set(
@@ -37,7 +36,9 @@ scale_fill_discrete = scale_fill_viridis_d
 Skip
 
 ##Q2
-#### Weather data
+
+Weather data
+
 ```{r}
 weather_df = 
   rnoaa::meteo_pull_monitors(
@@ -52,4 +53,86 @@ weather_df =
   select(name, id, everything())
 ```
 
+Set up Bootstrap samples
+
+```{r}
+boot_straps = 
+  weather_df |>
+  modelr::bootstrap(n = 5000) |>
+  mutate(
+    models = map(strap, \(df) lm(tmax ~ tmin + prcp, data = df)),
+    results_1 = map(models, broom::tidy),
+    results_2 = map(models, broom::glance)) |>
+  select(-strap, -models)
+```
+
+###Estimating r2
+
+```{r}
+r2 = 
+  boot_straps |>
+  select(-results_1) |>
+  unnest(results_2) |>
+  select(.id, r.squared)
+```
+
+Plot the distribution of your estimates (r^2)
+
+```{r}
+r2 |> 
+  ggplot(aes(x = r.squared)) + geom_density(fill = "orange")
+```
+
+Calculating 2.5% and 97.5% quantiles of r2, thus estimating 95%CI.
+
+```{r}
+lowerq_r2 <- quantile(r2$r.squared, 0.025)
+
+upperq_r2 <- quantile(r2$r.squared, 0.975)
+
+confidence_interval_r2 <- c(lowerq_r2, upperq_r2)
+
+confidence_interval_r2
+```
+The estimated 2.5% quantile is 0.888 and 97.5% quantile is 0.941, thus the 95%CI is (0.888, 0.941)
+
+
+
+###Estimating log(β^1∗β^2)
+
+```{r}
+logbeta = 
+  boot_straps |>
+  select(-results_2) |>
+  unnest(results_1) |>
+  select(.id, term, estimate) |>
+  mutate(term = ifelse(term == "tmin", "b1", ifelse(term == "prcp", "b2", term))) |>
+  pivot_wider(names_from = term, values_from = estimate) |>
+  mutate(log_result = log(b1 * b2))
+```
+
+Plot the distribution of your estimates log(β^1∗β^2)
+
+```{r}
+logbeta |> 
+  ggplot(aes(x = log_result)) + geom_density(fill = "violet")
+```
+
+According to the plot, it is a left-skewed distribution. 
+
+Calculating 2.5% and 97.5% quantiles of log(β^1∗β^2), thus estimating 95%CI for log(β^1∗β^2)
+
+```{r}
+lowerq_log <- quantile(logbeta$log_result, 0.025, na.rm = TRUE)
+
+upperq_log <- quantile(logbeta$log_result, 0.975, na.rm = TRUE)
+
+confidence_interval_log <- c(lowerq_log, upperq_log)
+
+confidence_interval_log
+```
+2.5% and 97.5% quantiles for log(β^1∗β^2) respectively are -9.069 and -4.593.Thus the 95% CI are (-9.069, -4.593).
+
+
+##Q3
 

@@ -136,3 +136,25 @@ confidence_interval_log
 
 ##Q3
 
+Load and clean the birthweight.csv datafile.
+
+```{r}
+birthweight_df = 
+  read_csv("birthweight.csv") |>
+  janitor::clean_names() |>
+  mutate(babysex = as.factor(babysex),
+         frace = case_when(frace == 1 ~ "White",
+                           frace == 2 ~ "Black",
+                           frace == 3 ~ "Asian",
+                           frace == 4 ~ "Puerto",
+                           frace == 8 ~ "Other",
+                           frace == 9 ~ "Unknown"),
+         frace = as.factor(frace),
+         malform = as.factor(malform),
+         mrace = case_when(mrace == 1 ~ "White",
+                           mrace == 2 ~ "Black",
+                           mrace == 3 ~ "Asian",
+                           mrace == 4 ~ "Puerto Rican",
+                           mrace == 8 ~ "Other"),
+         mrace = as.factor(mrace))
+```
